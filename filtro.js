@@ -32,7 +32,7 @@ $(document).ready(function () {
     function createPopupContent(row) {
         var popupContent = '';
         Object.keys(row).forEach(function (key) {
-            if (!['LATITUD', 'LONGITUD'].includes(key)) {
+            if (!['LATITUD', 'LONGITUD', "UBICACIÓN"].includes(key)) {
                 popupContent += `${key}: ${row[key]}<br>`;
             }
         });

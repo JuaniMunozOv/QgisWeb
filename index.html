@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+
+    <meta charset="UTF-8">
+    <title>Mapa de Terrenos</title>
+    <style>
+        #map {
+            height: 600px;
+            width: 100%;
+        }
+
+        .dropdownContainer {
+            position: relative;
+            display: inline-block;
+            margin-right: 20px;
+        }
+
+        .dropdownContent {
+            display: none;
+            position: absolute;
+            background-color: #f9f9f9;
+            min-width: 160px;
+            max-height: 130px;
+            /* Altura para mostrar aproximadamente 5 elementos */
+            overflow-y: auto;
+            /* Muestra scrollbar verticalmente si es necesario */
+            box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+        }
+
+        .dropdownContent div {
+            color: black;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+        }
+
+        .dropdownContent div:hover {
+            background-color: #f1f1f1
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="REF" class="dropdownContainer">
+        <button class="dropdownButton">Cargando...</button>
+        <div class="dropdownContent"></div>
+    </div>
+    <div id="MERCADO" class="dropdownContainer">
+        <button class="dropdownButton">Cargando...</button>
+        <div class="dropdownContent"></div>
+    </div>
+    <div id="HECTAREAS" class="dropdownContainer">
+        <button class="dropdownButton">Cargando...</button>
+        <div class="dropdownContent"></div>
+    </div>
+    <div id="PRECIO" class="dropdownContainer">
+        <button class="dropdownButton">Cargando...</button>
+        <div class="dropdownContent"></div>
+    </div>
+    <div id="USOSUELO" class="dropdownContainer">
+        <button class="dropdownButton">Cargando...</button>
+        <div class="dropdownContent"></div>
+    </div>
+    <div id="PROPIEDAD" class="dropdownContainer">
+        <button class="dropdownButton">Cargando...</button>
+        <div class="dropdownContent"></div>
+    </div>
+
+    <div id="map"></div>
+
+
+    <script>
+        window.onload = function () {
+            // Inicializar el mapa
+            var map = L.map('map').setView([25.69983, -107.87211], 4.5);
+            L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+                attribution: '© Google Maps Hybrid',
+            }).addTo(map);
+
+            var allMarkers = []; // Almacenará todos los marcadores para futuras operaciones de filtrado
+
+            fetch('QGISDATOS.csv')
+                .then(response => response.text())
+                .then(data => {
+                    const rows = data.split('\n').slice(1).map(row => row.split(';')); // Suponiendo que la primera fila es el encabezado
+                    // Asume que otras columnas contienen datos para los dropdowns
+                    const firstColumnItems = [...new Set(rows.map(row => row[0]))]; // Elimina duplicados para 'Referencia'
+                    const secondColumnItems = [...new Set(rows.map(row => row[1]))]; // Elimina duplicados para 'Mercado'
+                    const fourthColumnItems = [...new Set(rows.map(row => row[3]))]; // Elimina duplicados para 'Hectareas'
+                    const fifthColumnItems = [...new Set(rows.map(row => row[4]))]; // Elimina duplicados para 'Precio'
+                    const eigthColumnItems = [...new Set(rows.map(row => row[7]))]; // Elimina duplicados para 'Uso de Suelo'
+                    const tenColumnItems = [...new Set(rows.map(row => row[9]))]; // Elimina duplicados para 'Propiedad'
+
+
+                    rows.forEach(row => {
+                        if (row[13] && row[12]) {
+                            const marker = L.marker([parseFloat(row[13]), parseFloat(row[12])], {
+                                title: row[0] // Suponiendo que quieres filtrar basado en la primera columna, ajusta según sea necesario
+                            }).addTo(map);
+                            // Almacena información adicional necesaria para el filtrado
+                            marker.customInfo = {
+                                REF: row[0], // Asume que quieres filtrar por 'Referencia'
+                                MERCADO: row[1], // Asume que quieres filtrar por 'Mercado'
+                                HECTAREAS: row[3], // Asume que quieres filtrar por 'Hectareas'
+                                PRECIO: row[4], // Asume que quieres filtrar por 'Precio'
+                                USOSUELO: row[7], // Asume que quieres filtrar por 'Uso de Suelo'
+                                PROPIEDAD: row[9], // Asume que quieres filtrar por 'Propiedad'
+                            };
+                            allMarkers.push(marker);
+                        }
+                    });
+
+                    createDropdown(firstColumnItems, 'REF', 'Referencia', allMarkers, 'REF');
+                    createDropdown(secondColumnItems, 'MERCADO', 'Mercado', allMarkers, 'MERCADO');
+                    createDropdown(fourthColumnItems, 'HECTAREAS', 'Hectareas', allMarkers, 'HECTAREAS');
+                    createDropdown(fifthColumnItems, 'PRECIO', 'Precio', allMarkers, 'PRECIO');
+                    createDropdown(eigthColumnItems, 'USOSUELO', 'Uso de Suelo', allMarkers, 'USOSUELO');
+                    createDropdown(tenColumnItems, 'PROPIEDAD', 'Propiedad', allMarkers, 'PROPIEDAD');
+
+                })
+                .catch(error => console.error('Error al cargar el archivo CSV:', error));
+
+        };
+
+
+        function createDropdown(items, containerId, buttonText, markers, filterKey) {
+            const container = document.getElementById(containerId);
+            const button = container.querySelector('.dropdownButton');
+            const dropdownContent = container.querySelector('.dropdownContent');
+
+            button.textContent = buttonText; // Texto inicial del botón
+            dropdownContent.innerHTML = ''; // Limpiar opciones previas
+
+            // Opción para mostrar todos los marcadores
+            const showAllOption = document.createElement('div');
+            showAllOption.textContent = 'Mostrar todos';
+            dropdownContent.appendChild(showAllOption);
+
+            showAllOption.addEventListener('click', function () {
+                button.textContent = buttonText; // Restablece el texto del botón
+                dropdownContent.style.display = 'none'; // Oculta las opciones
+                markers.forEach(marker => map.addLayer(marker)); // Muestra todos los marcadores
+            });
+
+            // Opciones para filtrar
+            items.forEach(item => {
+                if (item) {
+                    const option = document.createElement('div');
+                    option.textContent = item;
+                    dropdownContent.appendChild(option);
+
+                    option.addEventListener('click', function () {
+                        button.textContent = item; // Actualiza el texto del botón
+                        dropdownContent.style.display = 'none'; // Oculta las opciones
+                        // Filtrar marcadores
+                        markers.forEach(marker => {
+                            if (marker.customInfo[filterKey] === item) {
+                                map.addLayer(marker); // Muestra marcador si coincide
+                            } else {
+                                map.removeLayer(marker); // Oculta marcador si no coincide
+                            }
+                        });
+                    });
+                }
+            });
+
+            button.addEventListener('click', function (event) {
+                event.stopPropagation(); // Evita que el clic se propague
+                dropdownContent.style.display = dropdownContent.style.display === 'block' ? 'none' : 'block';
+            });
+        }
+
+
+    </script>
+
+</body>
+
+</html>
